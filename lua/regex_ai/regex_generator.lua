@@ -30,17 +30,41 @@ Example:
 	)
 end
 
+local function start_spinner()
+	local spinner_symbols = { "|", "/", "-", "\\" }
+	local spinner_index = 1
+
+	-- Define a function to update the spinner
+	local function update_spinner()
+		if not M.loading then
+			vim.api.nvim_echo({ { "" } }, false, {}) -- Clear the spinner
+			return
+		end
+
+		vim.api.nvim_echo({ { spinner_symbols[spinner_index] .. " Loading...", "None" } }, false, {})
+		spinner_index = (spinner_index % #spinner_symbols) + 1
+		vim.defer_fn(update_spinner, 100)
+	end
+
+	-- Start the spinner
+	vim.defer_fn(update_spinner, 0)
+end
+
 M.generate_regex = function()
+	-- Start loading spinner
+	M.loading = true
+	start_spinner()
+
 	local h = utils.health()
-	vim.notify("health: ")
-	utils.notify(h)
+	-- vim.notify("health: ")
+	-- utils.notify(h)
 
 	local filetype = utils.get_filetype()
-	print("filetype: ", filetype)
+	-- print("filetype: ", filetype)
 	local current_line = vim.fn.getline(".")
-	print("line:  ", current_line)
+	-- print("line:  ", current_line)
 	local description = current_line
-	print("description: ", description)
+	-- print("description: ", description)
 
 	if not description then
 		vim.notify(
@@ -53,15 +77,17 @@ M.generate_regex = function()
 	local prompt = generate_regex_prompt(filetype, description)
 
 	llm.query(prompt, function(response)
+		M.loading = false
+
 		if response then
-			print("response: ", response)
+			-- print("response: ", response)
 			local json_content = response:match("^%s*%[.-%]%s*$")
 
 			if not json_content then
 				json_content = response:match("```json%s*(.-)%s*```")
 			end
 
-			print("json_content: ", json_content)
+			-- print("json_content: ", json_content)
 
 			if not json_content then
 				vim.notify("No se encontró un bloque JSON en la respuesta.", vim.log.levels.ERROR)
