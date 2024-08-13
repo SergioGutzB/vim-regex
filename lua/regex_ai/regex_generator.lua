@@ -11,6 +11,10 @@ Provide a JSON array of objects. Each object must contain two properties:
 * "regex": The regular expression for the %s programming language.
 * "description": A brief explanation of the regex.
 
+PRIORITY: YOU SHOULD TRY NO TO generate regular expressions that must match from the beginning to the end of the string. for example avoid generating regular expressions with `^` and `$`.
+
+IMPORTANT: try to generate as many regular expressions as possible that perfectly validate the requirement.
+
 Do not include any code, explanations, or other text. Output only the JSON array.
 
 If it only finds one object, it must also return it in an array.
@@ -30,24 +34,29 @@ Example:
 	)
 end
 
+local spinner_symbols = { "|", "/", "-", "\\" }
+local spinner_index = 1
+local spinner_timer
+
 local function start_spinner()
-	local spinner_symbols = { "|", "/", "-", "\\" }
-	local spinner_index = 1
-
-	-- Define a function to update the spinner
-	local function update_spinner()
-		if not M.loading then
+	spinner_timer = vim.defer_fn(function()
+		if M.loading then
+			vim.api.nvim_echo({ { spinner_symbols[spinner_index] .. " Loading...", "None" } }, false, {})
+			spinner_index = (spinner_index % #spinner_symbols) + 1
+			start_spinner()
+		else
 			vim.api.nvim_echo({ { "" } }, false, {}) -- Clear the spinner
-			return
 		end
+	end, 100)
+end
 
-		vim.api.nvim_echo({ { spinner_symbols[spinner_index] .. " Loading...", "None" } }, false, {})
-		spinner_index = (spinner_index % #spinner_symbols) + 1
-		vim.defer_fn(update_spinner, 100)
+local function stop_spinner()
+	M.loading = false
+	if spinner_timer then
+		vim.defer_fn(function()
+			vim.api.nvim_echo({ { "" } }, false, {}) -- Clear the spinner
+		end, 0)
 	end
-
-	-- Start the spinner
-	vim.defer_fn(update_spinner, 0)
 end
 
 M.generate_regex = function()
@@ -77,7 +86,7 @@ M.generate_regex = function()
 	local prompt = generate_regex_prompt(filetype, description)
 
 	llm.query(prompt, function(response)
-		M.loading = false
+		stop_spinner()
 
 		if response then
 			-- print("response: ", response)
